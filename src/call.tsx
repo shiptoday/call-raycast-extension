@@ -41,8 +41,10 @@ export default function Command() {
         end tell
       `;
 
-      const { stdout: testResult } = await execAsync(`osascript -e '${testScript}'`);
-      
+      const { stdout: testResult } = await execAsync(
+        `osascript -e '${testScript}'`,
+      );
+
       if (testResult.trim() === "error") {
         setPermissionError(true);
         setIsLoading(false);
@@ -121,8 +123,10 @@ export default function Command() {
         end tell
       `.trim();
 
-      const { stdout, stderr } = await execAsync(`osascript -e '${script.replace(/'/g, "'\"'\"'")}'`);
-      
+      const { stdout, stderr } = await execAsync(
+        `osascript -e '${script.replace(/'/g, "'\"'\"'")}'`,
+      );
+
       if (stderr && stderr.includes("not authorized")) {
         setPermissionError(true);
         setIsLoading(false);
@@ -135,20 +139,23 @@ export default function Command() {
         return;
       }
 
-      const lines = stdout.split("\n").filter(line => line.trim() !== "");
+      const lines = stdout.split("\n").filter((line) => line.trim() !== "");
       const parsedContacts: Contact[] = [];
 
       for (const line of lines) {
         const [name, phonesStr] = line.split("||");
         if (name && phonesStr) {
-          const phones = phonesStr.split("|").map(phoneStr => {
-            const [label, number] = phoneStr.split(":");
-            return { 
-              label: formatLabel(label), 
-              number: number ? number.trim() : "" 
-            };
-          }).filter(phone => phone.number);
-          
+          const phones = phonesStr
+            .split("|")
+            .map((phoneStr) => {
+              const [label, number] = phoneStr.split(":");
+              return {
+                label: formatLabel(label),
+                number: number ? number.trim() : "",
+              };
+            })
+            .filter((phone) => phone.number);
+
           if (phones.length > 0) {
             parsedContacts.push({ name: name.trim(), phones });
           }
@@ -158,15 +165,16 @@ export default function Command() {
       parsedContacts.sort((a, b) => a.name.localeCompare(b.name));
       setContacts(parsedContacts);
       setIsLoading(false);
-
     } catch (error: any) {
       console.error("Error loading contacts:", error);
-      
+
       // Check for various permission-related errors
-      if (error.message?.includes("not authorized") || 
-          error.message?.includes("Application isn't running") ||
-          error.message?.includes("execution error") ||
-          error.code === 1) {
+      if (
+        error.message?.includes("not authorized") ||
+        error.message?.includes("Application isn't running") ||
+        error.message?.includes("execution error") ||
+        error.code === 1
+      ) {
         setPermissionError(true);
         await showToast({
           style: Toast.Style.Failure,
@@ -180,25 +188,25 @@ export default function Command() {
           message: "Failed to load contacts",
         });
       }
-      
+
       setIsLoading(false);
     }
   }
 
   function formatLabel(label: string): string {
     if (!label) return "Phone";
-    
+
     const cleanLabel = label.replace(/_\$!</, "").replace(/>!\$_/, "").trim();
-    
+
     const labelMap: { [key: string]: string } = {
-      "mobile": "Mobile",
-      "home": "Home",
-      "work": "Work",
-      "main": "Main",
-      "iphone": "iPhone",
-      "other": "Other",
+      mobile: "Mobile",
+      home: "Home",
+      work: "Work",
+      main: "Main",
+      iphone: "iPhone",
+      other: "Other",
     };
-    
+
     const lowerLabel = cleanLabel.toLowerCase();
     return labelMap[lowerLabel] || cleanLabel;
   }
@@ -207,7 +215,7 @@ export default function Command() {
     try {
       const cleanNumber = phoneNumber.replace(/[\s\-\(\)\.]/g, "");
       const telUrl = `tel:${cleanNumber}`;
-      
+
       await open(telUrl);
       await showToast({
         style: Toast.Style.Success,
@@ -238,14 +246,18 @@ export default function Command() {
                   title="Open Contacts Privacy Settings"
                   icon={Icon.LockUnlocked}
                   onAction={() => {
-                    open("x-apple.systempreferences:com.apple.preference.security?Privacy_Contacts");
+                    open(
+                      "x-apple.systempreferences:com.apple.preference.security?Privacy_Contacts",
+                    );
                   }}
                 />
                 <Action
                   title="Open Automation Settings"
                   icon={Icon.Gear}
                   onAction={() => {
-                    open("x-apple.systempreferences:com.apple.preference.security?Privacy_Automation");
+                    open(
+                      "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation",
+                    );
                   }}
                 />
               </ActionPanel.Section>
@@ -269,7 +281,8 @@ export default function Command() {
                     showToast({
                       style: Toast.Style.Animated,
                       title: "How to Grant Permission",
-                      message: "1. Open Settings → Privacy & Security → Contacts → Enable Raycast\n2. Also check Automation → Raycast → Contacts",
+                      message:
+                        "1. Open Settings → Privacy & Security → Contacts → Enable Raycast\n2. Also check Automation → Raycast → Contacts",
                     });
                   }}
                 />

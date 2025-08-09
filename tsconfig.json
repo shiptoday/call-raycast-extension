@@ -10,7 +10,9 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "types": ["@raycast/api", "@types/node", "@types/react"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules"]
