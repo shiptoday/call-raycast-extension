@@ -27,7 +27,8 @@ Call your contacts directly from Raycast using the native macOS Phone app. Simpl
 
 ## Requirements
 
-* macOS 15 (Sequoia) or later with Phone app
+* macOS 26 (Tahoe) or later with Phone app
+* IOS 26 on your iphone
 * iPhone with Handoff enabled (Settings → General → AirPlay & Handoff → Calls on Other Devices)
 
 ## License
