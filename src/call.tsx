@@ -6,6 +6,7 @@ import {
   Toast,
   open,
   Icon,
+  LocalStorage,
 } from "@raycast/api";
 import { useEffect, useState } from "react";
 import { exec } from "child_process";
@@ -18,16 +19,55 @@ interface Contact {
   phones: { label: string; number: string }[];
 }
 
+const CONTACTS_CACHE_KEY = "cached_contacts";
+const CACHE_TIMESTAMP_KEY = "cache_timestamp";
+const CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
+
 export default function Command() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [permissionError, setPermissionError] = useState(false);
 
   useEffect(() => {
-    loadContacts();
+    loadContactsWithCache();
   }, []);
 
-  async function loadContacts() {
+  async function loadContactsWithCache() {
+    try {
+      // Try to load from cache first
+      const cachedContacts = await LocalStorage.getItem<string>(CONTACTS_CACHE_KEY);
+      const cacheTimestamp = await LocalStorage.getItem<string>(CACHE_TIMESTAMP_KEY);
+      
+      if (cachedContacts && cacheTimestamp) {
+        const timestamp = parseInt(cacheTimestamp);
+        const now = Date.now();
+        
+        // Check if cache is still valid (not older than 30 days)
+        if (now - timestamp < CACHE_DURATION) {
+          const parsedContacts = JSON.parse(cachedContacts) as Contact[];
+          setContacts(parsedContacts);
+          setIsLoading(false);
+          
+          // Show that we loaded from cache
+          await showToast({
+            style: Toast.Style.Success,
+            title: "Contacts Loaded",
+            message: "Using cached contacts",
+          });
+          return;
+        }
+      }
+      
+      // If no valid cache, load fresh contacts
+      await loadContacts(true);
+    } catch (error) {
+      console.error("Error loading cached contacts:", error);
+      // If cache loading fails, try loading fresh contacts
+      await loadContacts(true);
+    }
+  }
+
+  async function loadContacts(saveToCache: boolean = false) {
     try {
       // First, try a simple test to see if we have access
       const testScript = `
@@ -164,6 +204,23 @@ export default function Command() {
 
       parsedContacts.sort((a, b) => a.name.localeCompare(b.name));
       setContacts(parsedContacts);
+      
+      // Save to cache if requested
+      if (saveToCache && parsedContacts.length > 0) {
+        try {
+          await LocalStorage.setItem(CONTACTS_CACHE_KEY, JSON.stringify(parsedContacts));
+          await LocalStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+          await showToast({
+            style: Toast.Style.Success,
+            title: "Contacts Cached",
+            message: `${parsedContacts.length} contacts saved for quick access`,
+          });
+        } catch (cacheError) {
+          console.error("Error saving to cache:", cacheError);
+          // Continue even if caching fails
+        }
+      }
+      
       setIsLoading(false);
     } catch (error: any) {
       console.error("Error loading contacts:", error);
@@ -268,7 +325,7 @@ export default function Command() {
                   onAction={() => {
                     setPermissionError(false);
                     setIsLoading(true);
-                    loadContacts();
+                    loadContacts(true);
                   }}
                   shortcut={{ modifiers: ["cmd"], key: "r" }}
                 />
@@ -307,11 +364,11 @@ export default function Command() {
           actions={
             <ActionPanel>
               <Action
-                title="Refresh"
+                title="Refresh Contacts"
                 icon={Icon.ArrowClockwise}
-                onAction={() => {
+                onAction={async () => {
                   setIsLoading(true);
-                  loadContacts();
+                  await loadContacts(true);
                 }}
                 shortcut={{ modifiers: ["cmd"], key: "r" }}
               />
@@ -339,16 +396,45 @@ export default function Command() {
                     keywords={[contact.name, phone.number]}
                     actions={
                       <ActionPanel>
-                        <Action
-                          title={`Call ${contact.name}`}
-                          icon={Icon.Phone}
-                          onAction={() => makeCall(phone.number, contact.name)}
-                        />
-                        <Action.CopyToClipboard
-                          title="Copy Number"
-                          content={phone.number}
-                          shortcut={{ modifiers: ["cmd"], key: "c" }}
-                        />
+                        <ActionPanel.Section>
+                          <Action
+                            title={`Call ${contact.name}`}
+                            icon={Icon.Phone}
+                            onAction={() => makeCall(phone.number, contact.name)}
+                          />
+                          <Action.CopyToClipboard
+                            title="Copy Number"
+                            content={phone.number}
+                            shortcut={{ modifiers: ["cmd"], key: "c" }}
+                          />
+                        </ActionPanel.Section>
+                        <ActionPanel.Section>
+                          <Action
+                            title="Refresh Contacts"
+                            icon={Icon.ArrowClockwise}
+                            onAction={async () => {
+                              setIsLoading(true);
+                              await loadContacts(true);
+                            }}
+                            shortcut={{ modifiers: ["cmd"], key: "r" }}
+                          />
+                          <Action
+                            title="Clear Cache"
+                            icon={Icon.Trash}
+                            onAction={async () => {
+                              await LocalStorage.removeItem(CONTACTS_CACHE_KEY);
+                              await LocalStorage.removeItem(CACHE_TIMESTAMP_KEY);
+                              await showToast({
+                                style: Toast.Style.Success,
+                                title: "Cache Cleared",
+                                message: "Contact cache has been cleared",
+                              });
+                              setIsLoading(true);
+                              await loadContacts(true);
+                            }}
+                            shortcut={{ modifiers: ["cmd", "shift"], key: "delete" }}
+                          />
+                        </ActionPanel.Section>
                       </ActionPanel>
                     }
                   />
@@ -366,16 +452,45 @@ export default function Command() {
                 keywords={[contact.name, phone.number]}
                 actions={
                   <ActionPanel>
-                    <Action
-                      title="Call"
-                      icon={Icon.Phone}
-                      onAction={() => makeCall(phone.number, contact.name)}
-                    />
-                    <Action.CopyToClipboard
-                      title="Copy Number"
-                      content={phone.number}
-                      shortcut={{ modifiers: ["cmd"], key: "c" }}
-                    />
+                    <ActionPanel.Section>
+                      <Action
+                        title="Call"
+                        icon={Icon.Phone}
+                        onAction={() => makeCall(phone.number, contact.name)}
+                      />
+                      <Action.CopyToClipboard
+                        title="Copy Number"
+                        content={phone.number}
+                        shortcut={{ modifiers: ["cmd"], key: "c" }}
+                      />
+                    </ActionPanel.Section>
+                    <ActionPanel.Section>
+                      <Action
+                        title="Refresh Contacts"
+                        icon={Icon.ArrowClockwise}
+                        onAction={async () => {
+                          setIsLoading(true);
+                          await loadContacts(true);
+                        }}
+                        shortcut={{ modifiers: ["cmd"], key: "r" }}
+                      />
+                      <Action
+                        title="Clear Cache"
+                        icon={Icon.Trash}
+                        onAction={async () => {
+                          await LocalStorage.removeItem(CONTACTS_CACHE_KEY);
+                          await LocalStorage.removeItem(CACHE_TIMESTAMP_KEY);
+                          await showToast({
+                            style: Toast.Style.Success,
+                            title: "Cache Cleared",
+                            message: "Contact cache has been cleared",
+                          });
+                          setIsLoading(true);
+                          await loadContacts(true);
+                        }}
+                        shortcut={{ modifiers: ["cmd", "shift"], key: "delete" }}
+                      />
+                    </ActionPanel.Section>
                   </ActionPanel>
                 }
               />
